@@ -16,11 +16,10 @@
   max-width: 400px;
 }
 
-.register-card h1 {
-  text-align: center;
-  color: #667eea;
-  margin-bottom: 10px;
-  font-size: 2rem;
+.register-card .logo-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
 }
 
 .register-card h2 {

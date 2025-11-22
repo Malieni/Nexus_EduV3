@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import Logo from '../components/Logo'
 import './Login.css'
 
 const Login = () => {
@@ -37,7 +38,7 @@ const Login = () => {
   return (
     <div className="login-container">
       <div className="login-card">
-        <h1>Nexus Education</h1>
+        <Logo size="large" />
         <h2>Login</h2>
         
         {error && <div className="error-message">{error}</div>}

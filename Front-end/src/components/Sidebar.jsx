@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import Logo from './Logo'
 import Configuracoes from './Configuracoes'
 import PoliticasPrivacidade from './PoliticasPrivacidade'
 import './Sidebar.css'
@@ -20,7 +21,7 @@ const Sidebar = () => {
     <>
       <aside className="sidebar">
         <div className="sidebar-header">
-          <h2>Nexus Education</h2>
+          <Logo size="small" />
         </div>
         
         <nav className="sidebar-nav">

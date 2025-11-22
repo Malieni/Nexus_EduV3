@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import Logo from '../components/Logo'
 import './Register.css'
 
 const Register = () => {
@@ -43,7 +44,7 @@ const Register = () => {
   return (
     <div className="register-container">
       <div className="register-card">
-        <h1>Nexus Education</h1>
+        <Logo size="large" />
         <h2>Cadastro</h2>
         
         {error && <div className="error-message">{error}</div>}
