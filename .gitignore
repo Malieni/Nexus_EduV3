@@ -1,3 +1,8 @@
+# Arquivos de ambiente (NUNCA commitar!)
+.env
+.env.local
+.env.*.local
+
 # Python
 __pycache__/
 *.py[cod]
@@ -7,50 +12,38 @@ __pycache__/
 env/
 venv/
 ENV/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
+.venv
 *.egg-info/
-.installed.cfg
-*.egg
+dist/
+build/
 
-# Poetry
-poetry.lock
+# Node
+node_modules/
+dist/
+.DS_Store
+*.log
 
 # IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
+# Poetry
+poetry.lock
 
-# Database
-*.db
-*.sqlite
-
-# Credentials
-token.json
-credentials.json
-.env
-.env.local
-*.key
-
-# Temporary files
+# Arquivos temporários
 *.tmp
-*.bak
+*.temp
+
+# Uploads e dados sensíveis
+Back-end/uploads/
+Front-end/uploads/
+*.pdf
+*.docx
+*.doc
+

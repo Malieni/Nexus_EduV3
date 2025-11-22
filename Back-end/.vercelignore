@@ -1,0 +1,25 @@
+# Arquivos a ignorar no deploy do Vercel
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.pytest_cache/
+.coverage
+htmlcov/
+*.md
+!README.md
+.env
+.env.local
+.git/
+.gitignore
+poetry.lock
+pyproject.toml
+gerar-jwt-key.ps1
+gerar-jwt-key.py
+CONFIGURACAO.md
+VARIAVEIS_AMBIENTE.md
+

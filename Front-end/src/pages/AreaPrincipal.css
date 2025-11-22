@@ -1,0 +1,32 @@
+.area-principal {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f5f5f5;
+}
+
+.main-content {
+  flex: 1;
+  margin-left: 250px;
+  padding: 20px;
+}
+
+.main-header {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.main-header h1 {
+  color: #333;
+  font-size: 1.8rem;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    margin-left: 0;
+  }
+}
+

@@ -1,0 +1,9 @@
+# Arquivos a ignorar no deploy do Vercel
+node_modules/
+.env
+.env.local
+.git/
+.gitignore
+*.md
+!README.md
+
