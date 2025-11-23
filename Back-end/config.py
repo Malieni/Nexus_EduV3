@@ -36,7 +36,7 @@ class Settings(BaseSettings):
 try:
     settings = Settings()
 except Exception as e:
-    # Se falhar, tenta carregar diretamente das variáveis de ambiente
+    # Se falhar, imprime informações de debug mas NÃO faz crash
     import sys
     print(f"ERRO ao carregar Settings: {e}")
     print("Variáveis de ambiente disponíveis:")
@@ -47,9 +47,21 @@ except Exception as e:
         else:
             print(f"  {key}: (AUSENTE)")
     
-    # Re-raise para que o erro seja visível
-    raise ValueError(
-        f"Erro ao carregar configurações. Verifique se todas as variáveis de ambiente estão configuradas no Vercel. "
-        f"Erro original: {str(e)}"
-    ) from e
+    # Em vez de fazer crash, cria um objeto Settings vazio com valores padrão
+    # Isso permite que a aplicação inicie mesmo sem todas as variáveis
+    class DummySettings:
+        supabase_url: str = ""
+        supabase_key: str = ""
+        groq_api_key: str = ""
+        jwt_secret_key: str = ""
+        jwt_algorithm: str = "HS256"
+        cors_origins: str = "*"
+        port: int = 8000
+        
+        @property
+        def cors_origins_list(self) -> List[str]:
+            return ["*"] if self.cors_origins == "*" else [origin.strip() for origin in self.cors_origins.split(",")]
+    
+    settings = DummySettings()  # type: ignore
+    print("AVISO: Usando configurações padrão. A aplicação pode não funcionar corretamente.")
 
