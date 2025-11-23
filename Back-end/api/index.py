@@ -1,65 +1,32 @@
 """
 Vercel serverless handler para FastAPI
-VERSÃO ULTRA-MÍNIMA: Handler que SEMPRE funciona, mesmo se nada mais funcionar
-
-ESTRATÉGIA:
-- Handler criado imediatamente, antes de qualquer importação
-- Nenhuma importação no nível superior (exceto stdlib)
-- Tudo é importado dentro do handler quando necessário
-- Captura TODOS os erros possíveis
+VERSÃO ABSOLUTAMENTE MÍNIMA: Apenas o handler, sem nenhuma lógica extra
 """
-import sys
-import os
 import json
 
-# ============================================================================
-# HANDLER MÍNIMO ABSOLUTO - Criado ANTES de qualquer coisa
-# ============================================================================
 def handler(event, context):
     """
     Handler que SEMPRE funciona, mesmo se todas as dependências falharem.
-    Tenta carregar FastAPI e criar app apenas quando necessário.
     """
     try:
-        # Tenta importar FastAPI dentro do handler (lazy loading)
+        # Tenta importar FastAPI
         try:
             from fastapi import FastAPI
             from mangum import Mangum
             from fastapi.middleware.cors import CORSMiddleware
             
-            # Verifica se app já existe (singleton)
+            # Cria app se não existir
             if not hasattr(handler, '_app'):
-                # Cria app apenas uma vez
-                handler._app = FastAPI(
-                    title="Nexus Education API",
-                    version="0.1.0"
-                )
+                handler._app = FastAPI(title="Nexus Education API")
                 
-                # Configura CORS
+                # CORS
                 try:
+                    import os
                     cors_origins = ["*"]
-                    
-                    # Tenta carregar do config
-                    try:
-                        from config import settings
-                        if hasattr(settings, 'cors_origins_list'):
-                            cors_origins = settings.cors_origins_list.copy()
-                    except Exception:
-                        # Usa variáveis de ambiente
-                        cors_env = os.environ.get("CORS_ORIGINS", "")
-                        if cors_env:
-                            cors_origins = [origin.strip() for origin in cors_env.split(",")]
-                    
-                    # Adiciona URLs do Vercel
                     if os.environ.get("VERCEL_URL"):
-                        vercel_origin = f"https://{os.environ.get('VERCEL_URL')}"
-                        if vercel_origin not in cors_origins:
-                            cors_origins.append(vercel_origin)
-                    
+                        cors_origins.append(f"https://{os.environ.get('VERCEL_URL')}")
                     if os.environ.get("FRONTEND_URL"):
-                        frontend_url = os.environ.get("FRONTEND_URL")
-                        if frontend_url not in cors_origins:
-                            cors_origins.append(frontend_url)
+                        cors_origins.append(os.environ.get("FRONTEND_URL"))
                     
                     handler._app.add_middleware(
                         CORSMiddleware,
@@ -69,72 +36,61 @@ def handler(event, context):
                         allow_headers=["*"],
                     )
                 except Exception:
-                    pass  # Continua sem CORS
+                    pass
                 
                 # Rotas básicas
                 @handler._app.get("/")
                 async def root():
-                    return {
-                        "message": "Nexus Education API",
-                        "version": "0.1.0",
-                        "status": "running"
-                    }
+                    return {"message": "Nexus Education API", "status": "running"}
                 
                 @handler._app.get("/health")
                 async def health():
                     return {"status": "ok"}
                 
-                # Tenta registrar rotas
+                # Tenta rotas
                 try:
+                    import sys
+                    import os
+                    backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    if backend_dir not in sys.path:
+                        sys.path.insert(0, backend_dir)
                     from routes import auth, analysis
                     handler._app.include_router(auth.router)
                     handler._app.include_router(analysis.router)
                 except Exception:
-                    # Rotas não disponíveis, mas continua funcionando
                     pass
                 
-                # Handler Mangum
                 handler._mangum = Mangum(handler._app, lifespan="off")
             
-            # Usa o handler Mangum para processar a requisição
             return handler._mangum(event, context)
-            
         except ImportError as e:
-            # FastAPI não disponível - retorna erro detalhado
+            # Dependências não disponíveis
             return {
                 "statusCode": 500,
                 "headers": {"Content-Type": "application/json"},
                 "body": json.dumps({
                     "error": "FUNCTION_INVOCATION_FAILED",
-                    "message": "FastAPI não está disponível. Dependências podem não ter sido instaladas.",
+                    "message": "Dependências não estão disponíveis",
                     "import_error": str(e),
-                    "python_version": sys.version.split()[0],
-                    "sys_path": sys.path[:5],
-                    "instruction": "Verifique se as dependências foram instaladas durante o build."
-                }, indent=2)
+                    "instruction": "Verifique se o requirements.txt foi instalado durante o build."
+                })
             }
         except Exception as e:
-            # Qualquer outro erro
             return {
                 "statusCode": 500,
                 "headers": {"Content-Type": "application/json"},
                 "body": json.dumps({
                     "error": "FUNCTION_INVOCATION_FAILED",
-                    "message": f"Erro ao inicializar handler: {str(e)}",
-                    "error_type": type(e).__name__,
-                    "python_version": sys.version.split()[0],
-                    "instruction": "Verifique os logs do Vercel para mais detalhes."
-                }, indent=2)
+                    "message": f"Erro: {str(e)}",
+                    "error_type": type(e).__name__
+                })
             }
     except Exception as e:
-        # Último recurso - erro crítico
         return {
             "statusCode": 500,
             "headers": {"Content-Type": "application/json"},
             "body": json.dumps({
                 "error": "FUNCTION_INVOCATION_FAILED",
-                "message": f"Erro crítico no handler: {str(e)}",
-                "error_type": type(e).__name__,
-                "instruction": "Verifique os logs do Vercel para mais detalhes."
-            }, indent=2)
+                "message": f"Erro crítico: {str(e)}"
+            })
         }
