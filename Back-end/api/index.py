@@ -78,23 +78,21 @@ else:
     async def root():
         return {"message": "Nexus Education API", "version": "0.1.0"}
     
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
-
-
-@app.get("/favicon.ico")
-async def favicon():
-    """Endpoint para favicon - retorna 404 em vez de erro 500"""
-    from fastapi import HTTPException, status
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Favicon not found")
-
-
-@app.get("/favicon.png")
-async def favicon_png():
-    """Endpoint para favicon.png - retorna 404 em vez de erro 500"""
-    from fastapi import HTTPException, status
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Favicon not found")
+    @app.get("/health")
+    async def health():
+        return {"status": "ok"}
+    
+    @app.get("/favicon.ico")
+    async def favicon():
+        """Endpoint para favicon - retorna 404 em vez de erro 500"""
+        from fastapi import HTTPException, status
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Favicon not found")
+    
+    @app.get("/favicon.png")
+    async def favicon_png():
+        """Endpoint para favicon.png - retorna 404 em vez de erro 500"""
+        from fastapi import HTTPException, status
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Favicon not found")
     
     # Handler para Vercel serverless usando Mangum
     handler = Mangum(app, lifespan="off")
