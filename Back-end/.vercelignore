@@ -1,25 +1,13 @@
-# Arquivos a ignorar no deploy do Vercel
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
+# Ignorar cache do Vercel para garantir builds limpos
+.vercel
+node_modules
+__pycache__
+*.pyc
+*.pyo
+*.pyd
 .Python
-env/
-venv/
-ENV/
-.pytest_cache/
-.coverage
-htmlcov/
-*.md
-!README.md
-.env
-.env.local
-.git/
-.gitignore
-poetry.lock
-pyproject.toml
-gerar-jwt-key.ps1
-gerar-jwt-key.py
-CONFIGURACAO.md
-VARIAVEIS_AMBIENTE.md
-
+*.so
+*.egg
+*.egg-info
+dist
+build
