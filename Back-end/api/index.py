@@ -4,6 +4,7 @@ Este arquivo adapta a aplicação FastAPI para funcionar no Vercel
 """
 import sys
 import os
+import traceback
 
 # Adiciona o diretório pai ao path para importar módulos
 # Isso é necessário porque o Vercel executa a partir de api/
@@ -11,27 +12,35 @@ backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
-# Agora podemos importar os módulos
+# Tenta importar módulos básicos primeiro
 try:
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
-    from config import settings
-    from routes import auth, analysis
     from mangum import Mangum
 except Exception as e:
-    # Se houver erro de import, vamos criar uma app básica para debug
-    print(f"ERRO AO IMPORTAR MÓDULOS: {e}")
-    from fastapi import FastAPI
-    from mangum import Mangum
-    
-    app = FastAPI()
-    
-    @app.get("/")
-    async def root():
-        return {"error": f"Erro ao carregar módulos: {str(e)}"}
-    
-    handler = Mangum(app, lifespan="off")
+    print(f"ERRO CRÍTICO: Não foi possível importar FastAPI: {e}")
+    traceback.print_exc()
+    # Cria handler mínimo se nem FastAPI funcionar
+    def handler(event, context):
+        return {
+            "statusCode": 500,
+            "body": f"Erro crítico ao importar FastAPI: {str(e)}"
+        }
 else:
+    # Tenta importar config com tratamento de erros
+    try:
+        from config import settings
+    except Exception as e:
+        print(f"AVISO: Erro ao importar config: {e}")
+        traceback.print_exc()
+        # Cria settings padrão
+        class Settings:
+            cors_origins = "*"
+            @property
+            def cors_origins_list(self):
+                return ["*"]
+        settings = Settings()
+    
     # Cria a aplicação FastAPI
     app = FastAPI(
         title="Nexus Education API",
@@ -41,10 +50,10 @@ else:
     
     # CORS - Configuração dinâmica para produção
     try:
-        cors_origins = settings.cors_origins_list.copy()
+        cors_origins = settings.cors_origins_list.copy() if hasattr(settings, 'cors_origins_list') else ["*"]
     except Exception as e:
         print(f"ERRO AO CARREGAR CORS: {e}")
-        cors_origins = ["*"]  # Fallback para permitir todas as origens
+        cors_origins = ["*"]
     
     # Permite a URL do Vercel automaticamente
     if os.environ.get("VERCEL_URL"):
@@ -65,14 +74,15 @@ else:
         allow_headers=["*"],
     )
     
-    # Routes
+    # Routes - Tenta registrar as rotas, mas não faz crash se falhar
     try:
+        from routes import auth, analysis
         app.include_router(auth.router)
         app.include_router(analysis.router)
     except Exception as e:
-        print(f"ERRO AO REGISTRAR ROTAS: {e}")
-        import traceback
+        print(f"AVISO: Erro ao registrar rotas: {e}")
         traceback.print_exc()
+        # A aplicação ainda funciona, apenas sem essas rotas
     
     @app.get("/")
     async def root():
@@ -96,4 +106,3 @@ else:
     
     # Handler para Vercel serverless usando Mangum
     handler = Mangum(app, lifespan="off")
-
