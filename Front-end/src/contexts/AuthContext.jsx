@@ -49,9 +49,23 @@ export const AuthProvider = ({ children }) => {
       
       return { success: true }
     } catch (error) {
+      console.error('Erro ao fazer login:', error)
+      console.error('Resposta do servidor:', error.response)
+      
+      // Extrai mensagem de erro mais detalhada
+      let errorMessage = 'Erro ao fazer login'
+      
+      if (error.response) {
+        errorMessage = error.response.data?.detail || error.response.data?.message || errorMessage
+      } else if (error.request) {
+        errorMessage = 'Não foi possível conectar ao servidor. Verifique sua conexão.'
+      } else {
+        errorMessage = error.message || errorMessage
+      }
+      
       return {
         success: false,
-        error: error.response?.data?.detail || 'Erro ao fazer login'
+        error: errorMessage
       }
     }
   }
@@ -72,9 +86,26 @@ export const AuthProvider = ({ children }) => {
       
       return { success: true }
     } catch (error) {
+      console.error('Erro ao cadastrar:', error)
+      console.error('Resposta do servidor:', error.response)
+      
+      // Extrai mensagem de erro mais detalhada
+      let errorMessage = 'Erro ao cadastrar'
+      
+      if (error.response) {
+        // Erro com resposta do servidor
+        errorMessage = error.response.data?.detail || error.response.data?.message || errorMessage
+      } else if (error.request) {
+        // Requisição feita mas sem resposta
+        errorMessage = 'Não foi possível conectar ao servidor. Verifique sua conexão.'
+      } else {
+        // Erro ao configurar a requisição
+        errorMessage = error.message || errorMessage
+      }
+      
       return {
         success: false,
-        error: error.response?.data?.detail || 'Erro ao cadastrar'
+        error: errorMessage
       }
     }
   }
