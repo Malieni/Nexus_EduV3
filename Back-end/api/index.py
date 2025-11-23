@@ -6,11 +6,27 @@ import sys
 import os
 import traceback
 
+# Configura logging para debug
+import logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+print("=" * 80)
+print("🚀 Iniciando carregamento do módulo api/index.py")
+print("=" * 80)
+print(f"📁 Diretório atual: {os.getcwd()}")
+print(f"📁 Arquivo atual: {__file__}")
+
 # Adiciona o diretório pai ao path para importar módulos
 # Isso é necessário porque o Vercel executa a partir de api/
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+print(f"📁 Backend dir: {backend_dir}")
+print(f"📁 Sys.path antes: {sys.path}")
+
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
+    
+print(f"📁 Sys.path depois: {sys.path}")
 
 # Captura TODOS os erros possíveis durante a inicialização
 app = None
@@ -85,22 +101,74 @@ else:
         print("✅ CORS configurado")
         
         # Routes - Tenta registrar as rotas, mas não faz crash se falhar
+        # Importa cada módulo individualmente para identificar problemas
+        routes_loaded = False
         try:
-            from routes import auth, analysis
+            print("📦 Tentando importar módulo routes.auth...")
+            from routes import auth
+            print("✅ routes.auth importado")
+            
+            print("📦 Tentando importar módulo routes.analysis...")
+            from routes import analysis
+            print("✅ routes.analysis importado")
+            
+            print("📦 Registrando router auth...")
             app.include_router(auth.router)
+            print("✅ Router auth registrado")
+            
+            print("📦 Registrando router analysis...")
             app.include_router(analysis.router)
-            print("✅ Rotas registradas com sucesso")
+            print("✅ Router analysis registrado")
+            
+            routes_loaded = True
+            print("✅ Todas as rotas registradas com sucesso")
+        except ImportError as e:
+            print(f"❌ ERRO DE IMPORTAÇÃO ao registrar rotas: {e}")
+            traceback.print_exc()
+            # Tenta importar dependências individuais para identificar o problema
+            try:
+                print("🔍 Tentando importar models...")
+                import models
+                print("✅ models importado")
+            except Exception as models_error:
+                print(f"❌ Erro ao importar models: {models_error}")
+                traceback.print_exc()
+            
+            try:
+                print("🔍 Tentando importar services...")
+                import services
+                print("✅ services importado")
+            except Exception as services_error:
+                print(f"❌ Erro ao importar services: {services_error}")
+                traceback.print_exc()
+            
+            try:
+                print("🔍 Tentando importar middleware...")
+                import middleware
+                print("✅ middleware importado")
+            except Exception as middleware_error:
+                print(f"❌ Erro ao importar middleware: {middleware_error}")
+                traceback.print_exc()
+            
+            # Cria rotas básicas para indicar o problema
+            @app.get("/api/auth/status")
+            async def auth_status():
+                return {"error": "Rotas de autenticação não disponíveis", "details": str(e), "type": type(e).__name__}
+            
+            @app.get("/api/analysis/status")
+            async def analysis_status():
+                return {"error": "Rotas de análise não disponíveis", "details": str(e), "type": type(e).__name__}
         except Exception as e:
-            print(f"⚠️ AVISO: Erro ao registrar rotas: {e}")
+            print(f"❌ ERRO INESPERADO ao registrar rotas: {e}")
             traceback.print_exc()
             # Cria rotas básicas para indicar o problema
             @app.get("/api/auth/status")
             async def auth_status():
-                return {"error": "Rotas de autenticação não disponíveis", "details": str(e)}
+                return {"error": "Rotas de autenticação não disponíveis", "details": str(e), "type": type(e).__name__}
             
             @app.get("/api/analysis/status")
             async def analysis_status():
-                return {"error": "Rotas de análise não disponíveis", "details": str(e)}
+                return {"error": "Rotas de análise não disponíveis", "details": str(e), "type": type(e).__name__}
         
         # Rotas básicas
         @app.get("/")
@@ -150,10 +218,25 @@ else:
 # Garante que handler existe
 if handler is None:
     print("❌ Handler não foi criado! Criando handler de emergência...")
-    def handler(event, context):
-        return {
-            "statusCode": 500,
-            "body": "Erro: Handler não foi inicializado corretamente"
-        }
+    try:
+        # Tenta criar uma app mínima
+        app = FastAPI()
+        @app.get("/")
+        async def root():
+            return {"error": "Handler não foi inicializado corretamente", "message": "Verifique os logs"}
+        handler = Mangum(app, lifespan="off")
+        print("✅ Handler de emergência criado")
+    except Exception as e:
+        print(f"❌ Erro ao criar handler de emergência: {e}")
+        traceback.print_exc()
+        def handler(event, context):
+            return {
+                "statusCode": 500,
+                "body": "Erro: Handler não foi inicializado corretamente"
+            }
 
+print("=" * 80)
 print("✅ Módulo api/index.py carregado com sucesso")
+print(f"✅ Handler criado: {handler is not None}")
+print(f"✅ App criada: {app is not None if 'app' in globals() else False}")
+print("=" * 80)
