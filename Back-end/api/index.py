@@ -2,9 +2,9 @@
 Vercel serverless handler para FastAPI
 ESTRATÉGIA: Handler mínimo que SEMPRE funciona, mesmo se tudo mais falhar
 
-DIAGNÓSTICO: Build Logs mostram que dependências estão sendo "instaladas" 
-mas não há confirmação de instalação bem-sucedida. Este handler tem logs
-detalhados para identificar exatamente onde está falhando.
+DIAGNÓSTICO: Build Logs mostram "Installing dependencies" mas não confirmam
+instalação. Este handler verifica se dependências estão disponíveis e fornece
+diagnóstico detalhado.
 """
 import sys
 import os
@@ -14,19 +14,22 @@ import json
 # ============================================================================
 # HANDLER DE EMERGÊNCIA - Criado PRIMEIRO para garantir que sempre existe
 # ============================================================================
-def create_emergency_handler(error_message=None):
+def create_emergency_handler(error_message=None, diagnostic_info=None):
     """Cria um handler de emergência que sempre funciona"""
     def emergency_handler(event, context):
+        response = {
+            "error": "FUNCTION_INVOCATION_FAILED",
+            "message": error_message or "Erro durante inicialização do módulo",
+            "instruction": "Verifique os logs do Vercel para mais detalhes",
+            "python_version": sys.version.split()[0] if hasattr(sys, 'version') else "unknown",
+            "sys_path": sys.path[:5] if hasattr(sys, 'path') else []  # Primeiros 5 itens
+        }
+        if diagnostic_info:
+            response["diagnostic"] = diagnostic_info
         return {
             "statusCode": 500,
             "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({
-                "error": "FUNCTION_INVOCATION_FAILED",
-                "message": error_message or "Erro durante inicialização do módulo",
-                "instruction": "Verifique os logs do Vercel para mais detalhes",
-                "python_version": sys.version.split()[0] if hasattr(sys, 'version') else "unknown",
-                "sys_path": sys.path[:3] if hasattr(sys, 'path') else []  # Primeiros 3 itens para debug
-            })
+            "body": json.dumps(response, indent=2)
         }
     return emergency_handler
 
@@ -34,8 +37,15 @@ def create_emergency_handler(error_message=None):
 handler = create_emergency_handler("Tentando inicializar módulo...")
 
 # ============================================================================
-# PASSO 1: Logs iniciais e configuração de sys.path
+# PASSO 1: Logs iniciais e diagnóstico do ambiente
 # ============================================================================
+diagnostic_info = {
+    "step": "initialization",
+    "errors": [],
+    "available_modules": [],
+    "missing_modules": []
+}
+
 try:
     print("=" * 80)
     print("🚀 INICIANDO CARREGAMENTO DO MÓDULO api/index.py")
@@ -47,57 +57,93 @@ try:
     # Configurar sys.path ANTES de qualquer importação
     backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     print(f"Backend directory: {backend_dir}")
-    print(f"Sys.path before: {sys.path[:3]}")
+    print(f"Sys.path (first 5): {sys.path[:5]}")
     
     if backend_dir not in sys.path:
         sys.path.insert(0, backend_dir)
         print(f"✅ Added {backend_dir} to sys.path")
     
-    print(f"Sys.path after: {sys.path[:3]}")
+    # Verifica se diretórios de módulos existem
+    diagnostic_info["sys_path"] = sys.path[:5]
+    diagnostic_info["backend_dir"] = backend_dir
+    
 except Exception as e:
-    print(f"❌ ERRO ao configurar sys.path: {e}")
+    error_msg = f"Erro ao configurar sys.path: {e}"
+    print(f"❌ {error_msg}")
     traceback.print_exc()
-    # Continua mesmo se falhar
+    diagnostic_info["errors"].append(error_msg)
 
 # ============================================================================
-# PASSO 2: Tentar importar FastAPI com diagnóstico detalhado
+# PASSO 2: Verificar disponibilidade de módulos Python padrão
+# ============================================================================
+print("\n📦 PASSO 2: Verificando módulos Python padrão...")
+standard_modules = ["json", "os", "sys", "traceback"]
+for module_name in standard_modules:
+    try:
+        __import__(module_name)
+        diagnostic_info["available_modules"].append(module_name)
+        print(f"  ✅ {module_name} disponível")
+    except Exception as e:
+        diagnostic_info["missing_modules"].append(module_name)
+        print(f"  ❌ {module_name} NÃO disponível: {e}")
+
+# ============================================================================
+# PASSO 3: Tentar importar FastAPI com diagnóstico detalhado
 # ============================================================================
 app = None
 FastAPI_available = False
 CORSMiddleware_available = False
 Mangum_available = False
-import_errors = []
 
+print("\n📦 PASSO 3: Tentando importar FastAPI...")
 try:
-    print("\n📦 PASSO 2: Tentando importar FastAPI...")
+    # Primeiro, verifica se o diretório fastapi existe em algum lugar do sys.path
+    fastapi_found = False
+    for path in sys.path:
+        fastapi_path = os.path.join(path, 'fastapi')
+        if os.path.exists(fastapi_path) or os.path.exists(fastapi_path + '.py'):
+            print(f"  ✅ Encontrado fastapi em: {path}")
+            fastapi_found = True
+            break
+    
+    if not fastapi_found:
+        print("  ⚠️ Diretório 'fastapi' não encontrado em nenhum sys.path")
+        print("  Verificando sys.path completo:")
+        for i, path in enumerate(sys.path[:10]):  # Primeiros 10
+            print(f"    {i}: {path}")
+            if os.path.exists(path):
+                contents = os.listdir(path)[:5]  # Primeiros 5 itens
+                print(f"      Conteúdo: {contents}")
+    
+    # Tenta importar
     from fastapi import FastAPI
     FastAPI_available = True
+    diagnostic_info["available_modules"].append("fastapi")
     print("✅ FastAPI importado com sucesso")
 except ImportError as e:
-    import_errors.append(f"FastAPI ImportError: {e}")
-    print(f"❌ FastAPI ImportError: {e}")
+    error_msg = f"FastAPI ImportError: {e}"
+    diagnostic_info["errors"].append(error_msg)
+    diagnostic_info["missing_modules"].append("fastapi")
+    print(f"❌ {error_msg}")
     traceback.print_exc()
-    # Verifica se o módulo existe no sys.path
-    print(f"Verificando módulos disponíveis em sys.path...")
-    for path in sys.path[:3]:
-        fastapi_path = os.path.join(path, 'fastapi')
-        print(f"  Checking {fastapi_path}: {os.path.exists(fastapi_path)}")
+    # Atualiza handler com diagnóstico
+    handler = create_emergency_handler(
+        "FastAPI não disponível. Dependências podem não ter sido instaladas.",
+        diagnostic_info
+    )
 except Exception as e:
-    import_errors.append(f"FastAPI Exception: {e}")
-    print(f"❌ FastAPI Exception: {e}")
+    error_msg = f"FastAPI Exception: {e}"
+    diagnostic_info["errors"].append(error_msg)
+    print(f"❌ {error_msg}")
     traceback.print_exc()
 
-# Se FastAPI não estiver disponível, atualiza handler de emergência
-if not FastAPI_available:
-    error_msg = "FastAPI não disponível. " + "; ".join(import_errors)
-    handler = create_emergency_handler(error_msg)
-    print(f"⚠️ Usando handler de emergência: {error_msg}")
-else:
-    # Tenta importar outras dependências
+# Se FastAPI estiver disponível, tenta outras dependências
+if FastAPI_available:
     try:
         print("📦 Tentando importar CORSMiddleware...")
         from fastapi.middleware.cors import CORSMiddleware
         CORSMiddleware_available = True
+        diagnostic_info["available_modules"].append("fastapi.middleware.cors")
         print("✅ CORSMiddleware importado com sucesso")
     except Exception as e:
         print(f"⚠️ CORSMiddleware não disponível: {e}")
@@ -107,18 +153,22 @@ else:
         print("📦 Tentando importar Mangum...")
         from mangum import Mangum
         Mangum_available = True
+        diagnostic_info["available_modules"].append("mangum")
         print("✅ Mangum importado com sucesso")
     except Exception as e:
-        print(f"❌ Mangum não disponível: {e}")
+        error_msg = f"Mangum não disponível: {e}"
+        diagnostic_info["errors"].append(error_msg)
+        diagnostic_info["missing_modules"].append("mangum")
+        print(f"❌ {error_msg}")
         traceback.print_exc()
         Mangum_available = False
 
 # ============================================================================
-# PASSO 3: Criar aplicação FastAPI (se possível)
+# PASSO 4: Criar aplicação FastAPI (se possível)
 # ============================================================================
 if FastAPI_available and not app:
     try:
-        print("\n🔧 PASSO 3: Criando aplicação FastAPI...")
+        print("\n🔧 PASSO 4: Criando aplicação FastAPI...")
         app = FastAPI(
             title="Nexus Education API",
             description="API para sistema de análise de ementas acadêmicas",
@@ -136,11 +186,11 @@ if FastAPI_available and not app:
             app = None
 
 # ============================================================================
-# PASSO 4: Configurar CORS (se possível)
+# PASSO 5: Configurar CORS (se possível)
 # ============================================================================
 if app and CORSMiddleware_available:
     try:
-        print("\n🌐 PASSO 4: Configurando CORS...")
+        print("\n🌐 PASSO 5: Configurando CORS...")
         cors_origins = ["*"]
         
         # Tenta carregar do config
@@ -181,15 +231,14 @@ if app and CORSMiddleware_available:
     except Exception as e:
         print(f"⚠️ Erro ao configurar CORS: {e}")
         traceback.print_exc()
-        # Continua sem CORS
 
 # ============================================================================
-# PASSO 5: Registrar rotas (se possível)
+# PASSO 6: Registrar rotas (se possível)
 # ============================================================================
 routes_loaded = False
 if app:
     try:
-        print("\n📦 PASSO 5: Tentando registrar rotas...")
+        print("\n📦 PASSO 6: Tentando registrar rotas...")
         from routes import auth, analysis
         app.include_router(auth.router)
         app.include_router(analysis.router)
@@ -204,17 +253,29 @@ if app:
             try:
                 __import__(module_name)
                 print(f"  ✅ {module_name} importável")
+                diagnostic_info["available_modules"].append(module_name)
             except Exception as module_error:
                 print(f"  ❌ {module_name} falhou: {module_error}")
+                diagnostic_info["missing_modules"].append(module_name)
         # Cria rotas de diagnóstico
         try:
             @app.get("/api/auth/status")
             async def auth_status():
-                return {"status": "error", "message": "Rotas não carregadas", "error": str(e)}
+                return {
+                    "status": "error",
+                    "message": "Rotas não carregadas",
+                    "error": str(e),
+                    "diagnostic": diagnostic_info
+                }
             
             @app.get("/api/analysis/status")
             async def analysis_status():
-                return {"status": "error", "message": "Rotas não carregadas", "error": str(e)}
+                return {
+                    "status": "error",
+                    "message": "Rotas não carregadas",
+                    "error": str(e),
+                    "diagnostic": diagnostic_info
+                }
         except Exception:
             pass
     except Exception as e:
@@ -222,11 +283,11 @@ if app:
         traceback.print_exc()
 
 # ============================================================================
-# PASSO 6: Rotas básicas (sempre disponíveis se app existe)
+# PASSO 7: Rotas básicas (sempre disponíveis se app existe)
 # ============================================================================
 if app:
     try:
-        print("\n🔧 PASSO 6: Criando rotas básicas...")
+        print("\n🔧 PASSO 7: Criando rotas básicas...")
         
         @app.get("/")
         async def root():
@@ -236,7 +297,8 @@ if app:
                 "status": "running",
                 "routes_loaded": routes_loaded,
                 "fastapi_available": FastAPI_available,
-                "mangum_available": Mangum_available
+                "mangum_available": Mangum_available,
+                "diagnostic": diagnostic_info
             }
         
         @app.get("/health")
@@ -244,7 +306,8 @@ if app:
             return {
                 "status": "ok",
                 "routes_loaded": routes_loaded,
-                "fastapi_available": FastAPI_available
+                "fastapi_available": FastAPI_available,
+                "diagnostic": diagnostic_info
             }
         
         # Handlers para favicon
@@ -267,11 +330,11 @@ if app:
         traceback.print_exc()
 
 # ============================================================================
-# PASSO 7: Criar handler Mangum (se tudo estiver disponível)
+# PASSO 8: Criar handler Mangum (se tudo estiver disponível)
 # ============================================================================
 if app and Mangum_available:
     try:
-        print("\n🔧 PASSO 7: Criando handler Mangum...")
+        print("\n🔧 PASSO 8: Criando handler Mangum...")
         handler = Mangum(app, lifespan="off")
         print("✅ Handler Mangum criado com sucesso")
     except Exception as e:
@@ -285,8 +348,9 @@ if app and Mangum_available:
                 "body": json.dumps({
                     "error": "Mangum handler não disponível",
                     "details": str(e),
-                    "app_created": app is not None
-                })
+                    "app_created": app is not None,
+                    "diagnostic": diagnostic_info
+                }, indent=2)
             }
 
 # ============================================================================
@@ -294,7 +358,9 @@ if app and Mangum_available:
 # ============================================================================
 if handler is None or not callable(handler):
     print("⚠️ Handler não foi criado! Criando handler de emergência...")
-    handler = create_emergency_handler("Handler não foi criado corretamente")
+    diagnostic_info["step"] = "final_check"
+    diagnostic_info["errors"].append("Handler não foi criado corretamente")
+    handler = create_emergency_handler("Handler não foi criado corretamente", diagnostic_info)
 
 print("\n" + "=" * 80)
 print("✅ MÓDULO api/index.py CARREGADO")
@@ -303,4 +369,6 @@ print(f"  App criada: {app is not None if 'app' in globals() else False}")
 print(f"  FastAPI disponível: {FastAPI_available}")
 print(f"  Mangum disponível: {Mangum_available}")
 print(f"  Rotas carregadas: {routes_loaded}")
+print(f"  Módulos disponíveis: {len(diagnostic_info.get('available_modules', []))}")
+print(f"  Módulos faltando: {len(diagnostic_info.get('missing_modules', []))}")
 print("=" * 80)
