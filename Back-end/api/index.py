@@ -75,14 +75,24 @@ else:
     )
     
     # Routes - Tenta registrar as rotas, mas não faz crash se falhar
+    # Importa as rotas apenas quando necessário para evitar erros de inicialização
     try:
         from routes import auth, analysis
         app.include_router(auth.router)
         app.include_router(analysis.router)
+        print("Rotas registradas com sucesso")
     except Exception as e:
         print(f"AVISO: Erro ao registrar rotas: {e}")
         traceback.print_exc()
         # A aplicação ainda funciona, apenas sem essas rotas
+        # Cria rotas básicas para indicar o problema
+        @app.get("/api/auth/status")
+        async def auth_status():
+            return {"error": "Rotas de autenticação não disponíveis", "details": str(e)}
+        
+        @app.get("/api/analysis/status")
+        async def analysis_status():
+            return {"error": "Rotas de análise não disponíveis", "details": str(e)}
     
     @app.get("/")
     async def root():
